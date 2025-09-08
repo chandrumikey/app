@@ -7,7 +7,7 @@ from app.core.database import get_db
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
-@router.post("/", response_model=UserResponse)
+@router.post("/create/", response_model=UserResponse)
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
     return usercrud.create_user(db=db, user=user)
 
