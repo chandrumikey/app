@@ -22,12 +22,3 @@ app.include_router(usercrud.router)
 app.include_router(taskcrud.router)
 
 
-
-from fastapi import FastAPI, Request
-@app.options("/users/")
-async def handle_options(request: Request):
-    return JSONResponse(status_code=200)
-from fastapi.responses import JSONResponse
-@app.post("/users/create/")
-async def create_user(user: dict):
-    return {"message": "User created", "user": user}
