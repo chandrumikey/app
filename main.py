@@ -2,7 +2,8 @@ from fastapi import FastAPI, Depends
 from app.routes import user_routes as usercrud
 from app.routes import task_routes as taskcrud
 from fastapi.middleware.cors import CORSMiddleware
-
+from app.core.database import engine,Base
+Base.metadata.create_all(bind=engine)
 app = FastAPI(title="Prodexa API")
 
 origins={

@@ -11,4 +11,4 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
 
     # Relationship
-    tasks = relationship("Task", back_populates="user")
+    tasks = relationship("Task", back_populates="owner", cascade="all, delete-orphan")

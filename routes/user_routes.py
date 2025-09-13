@@ -1,74 +1,43 @@
-# from fastapi import APIRouter, Depends
-# from sqlalchemy.orm import Session
-# from app.models.usermodel import User as UserMaster
-# import app.crud.usercrud as usercrud
-# from fastapi.security import OAuth2PasswordRequestForm         
-# from app.schema.userschema import UserCreate, UserResponse
-# from app.core.database import get_db
-# from fastapi import FastAPI, Depends, HTTPException
-# from app.schema.userschema import Token
-# from app.core.auth import verify_password, create_access_token, get_password_hash
-
-# router = APIRouter(prefix="/users", tags=["Users"])
-
-# @router.post("/signup", response_model=UserResponse)
-# def signup(user: UserCreate, db: Session = Depends(get_db)):
-#     db_user = usercrud.get_user_by_email(db, user.email)
-#     if db_user:
-#         raise HTTPException(status_code=400, detail="Email already registered")
-#     new_user = usercrud.create_user(db, user)
-#     return new_user
-
-
-# # @router.post("/create/", response_model=UserResponse)
-# # def create_user(user: UserCreate, db: Session = Depends(get_db)):
-# #     return usercrud.create_user(db=db, user=user)
-
-# @router.post("/login", response_model=Token)
-# def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-#     user = db.query(UserMaster).filter(UserMaster.email == form_data.username).first()
-#     if not user or not verify_password(form_data.password, user.hashed_password):
-#         raise HTTPException(status_code=401, detail="Invalid credentials")
-    
-#     access_token = create_access_token(data={"sub": user.email})
-#     return {"access_token": access_token, "token_type": "bearer"}
-
-# @router.get("/", response_model=list[UserResponse])
-# def read_users(db: Session = Depends(get_db)):
-#     return usercrud.get_users(db)
-
-
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from typing import List
+from datetime import timedelta
+from app.schema import userschema as schemas
+from app.models.usermodel import User
+from app.crud import usercrud as crud
+from app.core import auth
+from app.core.database import get_db
 from fastapi.security import OAuth2PasswordRequestForm
 
-from app.schema.userschema import UserCreate, UserResponse, Token
-from app.crud import usercrud
-from app.core.database import get_db
-from app.core.auth import create_access_token
 
-router = APIRouter(prefix="/users", tags=["users"])
+router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-# Signup
-@router.post("/signup", response_model=UserResponse)
-def signup(user: UserCreate, db: Session = Depends(get_db)):
-    db_user = usercrud.get_user_by_email(db, user.email)
+@router.post("/register", response_model=schemas.UserResponse, status_code=status.HTTP_201_CREATED)
+def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    db_user = crud.get_user_by_email(db, email=user.email)
     if db_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    return usercrud.create_user(db, user)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
+    return crud.create_user(db=db, user=user)
 
-# Login
-@router.post("/login", response_model=Token)
+@router.post("/login", response_model=schemas.Token)
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = usercrud.get_user_by_email(db, form_data.username)
-    if not user or user.hashed_password != form_data.password:   # 🔑 simple compare
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+    user = crud.get_user_by_email(db, email=form_data.username)  # username = email
+    if not user or not auth.verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = auth.create_access_token(
+        data={"sub": user.email}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
 
-    token = create_access_token({"sub": user.email})
-    return {"access_token": token, "token_type": "bearer"}
-
-# Protected route
-@router.get("/me")
-def get_me(token: str = Depends(create_access_token)):
-    return {"msg": "You are logged in!", "token": token}
-
+@router.get("/me", response_model=schemas.UserResponse)
+def read_users_me(current_user: User = Depends(crud.get_current_active_user)):
+    return current_user

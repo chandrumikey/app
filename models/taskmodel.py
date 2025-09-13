@@ -1,19 +1,25 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum, ForeignKey, Date
 from sqlalchemy.orm import relationship
-from app.core.database import Base
 from datetime import datetime
+from app.core.database import Base  # your declarative_base
+
+import enum
+
+class PriorityEnum(str, enum.Enum):
+    low = "low"
+    medium = "medium"
+    high = "high"
 
 class Task(Base):
     __tablename__ = "tasks"
 
     id = Column(Integer, primary_key=True, index=True)
-    title = Column(String(255), nullable=False)
-    description = Column(Text, nullable=True)
-    status = Column(String(50), default="pending")
+    title = Column(String(200), nullable=False)
+    description = Column(String, nullable=True)
+    completed = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+    due_date = Column(Date, nullable=True)
+    priority = Column(Enum(PriorityEnum), default=PriorityEnum.medium)
+    owner_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
 
-    # Foreign key to user
-    user_id = Column(Integer, ForeignKey("users.id"))
-
-    # Relationship
-    user = relationship("User", back_populates="tasks")
+    owner = relationship("User", back_populates="tasks")  # Make sure your User model has tasks relationship
